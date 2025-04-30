@@ -3,75 +3,60 @@ import numpy as np
 import sys
 
 def normalize(mileages, prices):
-    mileage_min = min(mileages)
-    mileage_max = max(mileages)
-    mileage_range = mileage_max - mileage_min
-    price_min = min(prices)
-    price_max = max(prices)
-    price_range = price_max - price_min
+    mileage_min, mileage_max = min(mileages), max(mileages)
+    price_min, price_max = min(prices), max(prices)
 
-    EPSILON = 1e-10  # Small value to prevent division by very small numbers
+    mileage_range = mileage_max - mileage_min
+    price_range = price_max - price_min
+    EPSILON = 1e-10  # Защита от деления на очень маленькие числа
     if abs(mileage_range) < EPSILON or abs(price_range) < EPSILON:
-        print("Error: Data range too small for normalization")
+        print("Error: The data range is too small to normalize")
         sys.exit(1)
 
     mileages_n = [(m - mileage_min) / mileage_range for m in mileages]
     prices_n = [(p - price_min) / price_range for p in prices]
-    return mileages_n, prices_n
+    
+    return mileages_n, prices_n, mileage_min, mileage_range, price_min, price_range
 
-def denormalize(mileages, prices, theta0_n, theta1_n):
-    mileage_min = min(mileages)
-    mileage_max = max(mileages)
-    mileage_range = mileage_max - mileage_min
-    price_min = min(prices)
-    price_max = max(prices)
-    price_range = price_max - price_min
-
+def denormalize(theta0_n, theta1_n, mileage_min, mileage_range, price_min, price_range):
     theta0 = price_min + price_range * theta0_n - (price_range * theta1_n * mileage_min) / mileage_range
     theta1 = (price_range / mileage_range) * theta1_n
     return theta0, theta1
 
-def gradient_descent(x, y, learning_rate, num_iterations):
-    theta0_n = 0
-    theta1_n = 0
-
+def gradient_descent(x, y, learning_rate, iterations):
+    theta0, theta1 = 0.0, 0.0
     m = len(x)
 
-    x_numpy = np.array(x)
-    y_numpy = np.array(y)
+    x = np.array(x)
+    y = np.array(y)
 
-    for _ in range(num_iterations):
-        estimated_y = theta0_n + theta1_n * x_numpy
-        errors = estimated_y - y_numpy 
-        theta0_n_gradient = np.sum(errors) / m
-        theta1_n_gradient = np.sum(errors * x_numpy) / m
-        theta0_n -= learning_rate * theta0_n_gradient
-        theta1_n -= learning_rate * theta1_n_gradient
+    for _ in range(iterations):
+        predictions = theta0 + theta1 * x
+        errors = predictions - y
+        theta0 -= learning_rate * np.sum(errors) / m
+        theta1 -= learning_rate * np.sum(errors * x) / m
 
-    return theta0_n, theta1_n
-    
-def load_data(file_path):
-    data = pd.read_csv(file_path)
-    mileage = data['km'].values
-    price = data['price'].values
-    return mileage, price
+    return theta0, theta1
 
+def load_data(filepath):
+    data = pd.read_csv(filepath)
+    return data['km'].values, data['price'].values
 
-def save_parameters(theta0, theta1, file_path):
-    with open(file_path, 'w') as f:
-        f.write(f'{theta0},{theta1}')
+def save_parameters(theta0, theta1, filepath):
+    with open(filepath, 'w') as file:
+        file.write(f"{theta0},{theta1}")
 
 def main():
-    file_path = 'data.csv'  # The dataset file path
-    learning_rate = 0.1  # Reduce learning rate significantly
-    num_iterations = 2000      # Number of iterations for training
+    data_file = 'data.csv'
+    param_file = 'parameters.txt'
+    learning_rate = 0.1
+    iterations = 2000
 
-    mileages, prices = load_data(file_path)
-    mileages_n, prices_n = normalize(mileages, prices)
-    theta0_n, theta1_n = gradient_descent(mileages_n, prices_n, learning_rate, num_iterations)
-    
-    theta0, theta1 = denormalize(mileages, prices, theta0_n, theta1_n)
-    save_parameters(theta0, theta1, 'parameters.txt')
+    mileages, prices = load_data(data_file)
+    mileages_n, prices_n, mileage_min, mileage_range, price_min, price_range = normalize(mileages, prices)
+    theta0_n, theta1_n = gradient_descent(mileages_n, prices_n, learning_rate, iterations)
+    theta0, theta1 = denormalize(theta0_n, theta1_n, mileage_min, mileage_range, price_min, price_range)
+    save_parameters(theta0, theta1, param_file)
 
 if __name__ == '__main__':
     main()
